@@ -304,7 +304,7 @@ test("startResearch persists the spawn receipt before the first status poll", as
   assert.deepEqual(events, ["ping", "spawn", "onSpawn:start", "onSpawn:end", "status"]);
 });
 
-test("startResearch keeps workflowScript and passes the runtime timeout at the workflow root", async () => {
+test("startResearch keeps script and passes the runtime timeout at the workflow root", async () => {
   const bridge = statusBridge([{ state: "complete" }]);
   const receipt = await startResearch(
     bridge.pi,
@@ -322,9 +322,9 @@ test("startResearch keeps workflowScript and passes the runtime timeout at the w
   assert.equal(spawn.method, "spawn");
   assert.equal(spawn.params.async, true);
   assert.equal(spawn.params.timeoutMs, 100);
-  assert.match(String(spawn.params.workflowScript), /runs\.all/);
-  assert.match(String(spawn.params.workflowScript), /artifact-locator/);
-  assert.match(String(spawn.params.workflowScript), /artifact-analyzer/);
+  assert.match(String(spawn.params.script), /runs\.all/);
+  assert.match(String(spawn.params.script), /artifact-locator/);
+  assert.match(String(spawn.params.script), /artifact-analyzer/);
 });
 
 test("startResearch uses the default research timeout at the workflow root", async () => {

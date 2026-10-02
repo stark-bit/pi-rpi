@@ -575,7 +575,7 @@ export async function startResearch(
   const run = await launchOwnedRun(
     pi,
     (runTimeoutMs) => ({
-      workflowScript: `return runs.all([\n        ${items}\n      ])`,
+      script: `return runs.all([\n        ${items}\n      ])`,
       context: "fresh",
       async: true,
       timeoutMs: runTimeoutMs,
