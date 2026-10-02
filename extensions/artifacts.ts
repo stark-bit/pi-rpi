@@ -501,7 +501,10 @@ export function gitAddBlockReason(command: string, cwd: string): string | null {
   const trimmed = command.trim();
   if (/\b(?:sh|bash)\s+-c\b[\s\S]*\bgit\s+add\b/.test(trimmed))
     return "Refusing ambiguous git add; stage literal explicit safe source paths only.";
-  const mentionsAdd = /\badd\b/.test(trimmed);
+  const mentionsAdd =
+    /(?:^|[\s;&|])(?:git|\/usr\/bin\/git|["']git["']|["']\/usr\/bin\/git["'])\s+(?:-C\s+[^\s]+\s+)?add\b/.test(
+      trimmed,
+    ) || /(?:^|[\s;&|])(?:\$\{?\w+\}?|["']\$\{?\w+\}?["'])\s+add\b/.test(trimmed);
   const mentionsGit =
     /(?:^|[\s;&|])(?:git|\/usr\/bin\/git|["']git["']|["']\/usr\/bin\/git["'])\b/.test(trimmed) ||
     /(?:\$\{?\w+\}?|["']\$\{?\w+\}?["'])\s+add\b/.test(trimmed);

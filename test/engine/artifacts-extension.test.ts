@@ -746,6 +746,13 @@ test("git add guard blocks broad, artifact, chained, and indirect staging withou
     assert.ok(gitAddBlockReason(command, cwd), command);
   }
   assert.equal(gitAddBlockReason("git add src/a.ts test/a.test.ts", cwd), null);
+  assert.equal(
+    gitAddBlockReason(
+      'git commit -m "feat(stock): add taxonomy refinement selectors" && git rev-parse HEAD && git status --short',
+      cwd,
+    ),
+    null,
+  );
   assert.equal(gitAddBlockReason('echo "git add .pi/artifacts/task/file.md"', cwd), null);
   assert.equal(gitAddBlockReason('"quoted prose only"', cwd), null);
 });
