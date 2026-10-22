@@ -507,6 +507,7 @@ function assertReceiptFields(kind: Receipt["kind"], fields: Omit<Receipt, "kind"
     "agent-run": ["runId", "detail"],
     migration: ["detail"],
     "task-complete": [],
+    "task-reopen": [],
   };
   const allowed: Record<Receipt["kind"], Array<keyof typeof fields>> = {
     "status-change": ["artifactId", "detail"],
@@ -518,6 +519,7 @@ function assertReceiptFields(kind: Receipt["kind"], fields: Omit<Receipt, "kind"
     "agent-run": ["runId", "detail"],
     migration: ["detail"],
     "task-complete": ["detail"],
+    "task-reopen": ["detail"],
   };
   for (const name of required[kind])
     if (fields[name] === undefined) throw new EngineError(`Invalid ${field}.${name}: required for ${kind}.`);
@@ -645,7 +647,8 @@ function parseReceiptKind(value: unknown, field: string): Receipt["kind"] {
     kind !== "agent-run" &&
     kind !== "migration" &&
     kind !== "drift" &&
-    kind !== "task-complete"
+    kind !== "task-complete" &&
+    kind !== "task-reopen"
   )
     throw new EngineError(`Invalid ${field}: unknown receipt kind "${kind}".`);
   return kind;
@@ -908,6 +911,13 @@ export function requiredTypesApproved(manifest: TaskManifest): boolean {
     .every((type) => findArtifact(manifest, type)?.status === "approved");
 }
 
+/** Clear stored completion after a required approval breaks. */
+function clearCompletionIfBroken(manifest: TaskManifest, timestamp: string): void {
+  if (manifest.flow === "freeform" || manifest.completedAt === undefined || requiredTypesApproved(manifest)) return;
+  manifest.completedAt = undefined;
+  manifest.receipts.push({ kind: "task-reopen", timestamp });
+}
+
 function isArtifactCreationReady(manifest: TaskManifest, type: ArtifactType): boolean {
   if (findArtifact(manifest, type)) return false;
   try {
@@ -1146,6 +1156,7 @@ export async function createArtifact(taskDir: string, input: CreateArtifactInput
           timestamp: now,
         });
       }
+      clearCompletionIfBroken(manifest, now);
     }
 
     try {
@@ -1248,6 +1259,7 @@ export async function updateArtifact(
       previousContent !== content && !isVerifiedPhaseHeadingUpdate(manifest, artifact, previousContent, content)
         ? invalidateArtifactDependents(manifest, artifact.id, now)
         : [];
+    clearCompletionIfBroken(manifest, now);
     artifact.contentHash = hashContent(content);
     artifact.updatedAt = now;
     const temporaryPath = `${abs}.tmp-${process.pid}-${randomUUID()}`;

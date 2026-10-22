@@ -12,6 +12,7 @@ import {
   createArtifact,
   createTask,
   loadManifest,
+  saveManifest,
   nextIndex,
   openTask,
   resolvePrecedence,
@@ -327,6 +328,95 @@ test("updateArtifact updates content hash", async () => {
   // hashFile on disk matches
   const onDisk = await hashFile(join(taskDir, r.artifact.path));
   assert.equal(onDisk, updated.artifact.contentHash);
+  await rm(base, { recursive: true, force: true });
+});
+
+test("completed tasks reopen after substantive edits and preserve freeform completion", async () => {
+  const base = await mkTmp();
+  await createTask(base, {
+    slug: "reopen-edit",
+    title: "Reopen edit",
+    flow: "oneshot",
+    baseBranch: "main",
+    ticketBody: "ticket",
+  });
+  const taskDir = join(base, "reopen-edit");
+  await createArtifact(taskDir, {
+    type: "implementation",
+    description: "implementation",
+    content: "v1",
+    dependsOn: ["ticket"],
+  });
+  let manifest = await loadManifest(taskDir);
+  await setArtifactStatus(manifest, "implementation", "in-review", taskDir);
+  await setArtifactStatus(await loadManifest(taskDir), "implementation", "approved", taskDir);
+  await createArtifact(taskDir, {
+    type: "pr-description",
+    description: "description",
+    content: "description",
+    dependsOn: ["implementation"],
+  });
+  manifest = await setArtifactStatus(await loadManifest(taskDir), "pr-description", "in-review", taskDir);
+  manifest = await setArtifactStatus(manifest, "pr-description", "approved", taskDir);
+  assert.ok(manifest.completedAt);
+
+  const updated = await updateArtifact(taskDir, "implementation", "v2");
+  assert.equal(updated.manifest.completedAt, undefined);
+  assert.equal(updated.manifest.receipts.at(-1)?.kind, "task-reopen");
+  assert.equal((await loadManifest(taskDir)).completedAt, undefined);
+
+  await createTask(base, { slug: "freeform-reopen", title: "Freeform", flow: "freeform", baseBranch: "main" });
+  const freeformDir = join(base, "freeform-reopen");
+  const freeform = await loadManifest(freeformDir);
+  freeform.completedAt = "2024-01-01T00:00:00.000Z";
+  await saveManifest(freeformDir, freeform);
+  await createArtifact(freeformDir, { type: "research", description: "research", content: "v1", dependsOn: [] });
+  const freeformUpdate = await updateArtifact(freeformDir, "research", "v2");
+  assert.equal(freeformUpdate.manifest.completedAt, "2024-01-01T00:00:00.000Z");
+  assert.equal(
+    freeformUpdate.manifest.receipts.some((receipt) => receipt.kind === "task-reopen"),
+    false,
+  );
+  await rm(base, { recursive: true, force: true });
+});
+
+test("completed tasks reopen when an approved artifact is superseded", async () => {
+  const base = await mkTmp();
+  await createTask(base, {
+    slug: "reopen-supersede",
+    title: "Reopen supersede",
+    flow: "oneshot",
+    baseBranch: "main",
+    ticketBody: "ticket",
+  });
+  const taskDir = join(base, "reopen-supersede");
+  await createArtifact(taskDir, {
+    type: "implementation",
+    description: "implementation",
+    content: "v1",
+    dependsOn: ["ticket"],
+  });
+  await setArtifactStatus(await loadManifest(taskDir), "implementation", "in-review", taskDir);
+  await setArtifactStatus(await loadManifest(taskDir), "implementation", "approved", taskDir);
+  await createArtifact(taskDir, {
+    type: "pr-description",
+    description: "description",
+    content: "d",
+    dependsOn: ["implementation"],
+  });
+  await setArtifactStatus(await loadManifest(taskDir), "pr-description", "in-review", taskDir);
+  await setArtifactStatus(await loadManifest(taskDir), "pr-description", "approved", taskDir);
+  assert.ok((await loadManifest(taskDir)).completedAt);
+
+  const replacement = await createArtifact(taskDir, {
+    type: "implementation",
+    description: "implementation-v2",
+    content: "v2",
+    dependsOn: ["ticket"],
+    supersedes: "implementation",
+  });
+  assert.equal(replacement.manifest.completedAt, undefined);
+  assert.equal(replacement.manifest.receipts.at(-1)?.kind, "task-reopen");
   await rm(base, { recursive: true, force: true });
 });
 

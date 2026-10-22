@@ -40,7 +40,8 @@ export type ReceiptKind =
   | "agent-run"
   | "migration"
   | "drift"
-  | "task-complete";
+  | "task-complete"
+  | "task-reopen";
 
 export interface Receipt {
   kind: ReceiptKind;
