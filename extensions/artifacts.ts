@@ -24,6 +24,7 @@ import {
 import { Type } from "typebox";
 import { StringEnum } from "@earendil-works/pi-ai";
 import { Text } from "@earendil-works/pi-tui";
+import { createTaskPicker } from "../src/task-picker.ts";
 import { resolve, join, relative } from "node:path";
 import { mkdir, mkdtemp, readFile, writeFile, readdir, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -1192,21 +1193,29 @@ export default function artifactsExtension(pi: ExtensionAPI): void {
           /* Missing roots have no tasks. */
         }
         const groups = groupTasks(manifests);
-        const showAll = "Show all tasks…";
-        const activeLabels = groups.active.map((task) => taskLabel(task));
-        const choice = await ctx.ui.select("Select task:", [...activeLabels, showAll]);
-        if (!choice) return;
-        let selected: TaskRecord | undefined;
-        if (choice === showAll) {
-          const allLabels = groups.all.map((task) => taskLabel(task, true));
-          const allChoice = await ctx.ui.select("Select task:", allLabels);
-          if (!allChoice) return;
-          selected = groups.all[allLabels.indexOf(allChoice)];
+        if (ctx.mode !== "rpc") {
+          const selected = await ctx.ui.custom<TaskRecord | undefined>((tui, theme, keybindings, done) =>
+            createTaskPicker(groups, tui, theme, keybindings, done),
+          );
+          if (!selected) return;
+          slug = selected.manifest.slug;
         } else {
-          selected = groups.active[activeLabels.indexOf(choice)];
+          const showAll = "Show all tasks…";
+          const activeLabels = groups.active.map((task) => taskLabel(task));
+          const choice = await ctx.ui.select("Select task:", [...activeLabels, showAll]);
+          if (!choice) return;
+          let selected: TaskRecord | undefined;
+          if (choice === showAll) {
+            const allLabels = groups.all.map((task) => taskLabel(task, true));
+            const allChoice = await ctx.ui.select("Select task:", allLabels);
+            if (!allChoice) return;
+            selected = groups.all[allLabels.indexOf(allChoice)];
+          } else {
+            selected = groups.active[activeLabels.indexOf(choice)];
+          }
+          if (!selected) return;
+          slug = selected.manifest.slug;
         }
-        if (!selected) return;
-        slug = selected.manifest.slug;
       }
       const manifest = await tryLoadManifest(taskDir(root, slug));
       if (!manifest) {

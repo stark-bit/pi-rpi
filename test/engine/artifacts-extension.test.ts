@@ -547,7 +547,14 @@ test("rpi-task selects an existing task from the picker and does not create miss
   const project = await tempProject();
   const root = join(project, ".pi", "artifacts");
   const task = await createTask(root, { slug: "pick-me", title: "Pick me", flow: "rpi", baseBranch: "main" });
-  const { commands, context, statuses } = fakeExtensionApi([], undefined, ["pick-me · Pick me · rpi"]);
+  const { commands, context, statuses } = fakeExtensionApi(
+    [],
+    undefined,
+    ["pick-me · Pick me · rpi"],
+    undefined,
+    true,
+    "rpc",
+  );
   try {
     const suggestions = suggestTaskActions(await loadManifest(join(root, task.slug)));
     assert.equal(suggestions.length, 3);
@@ -586,7 +593,14 @@ test("rpi-task lists active tasks newest first, then all tasks on request", asyn
     await pause();
     await createTask(root, { slug: "new-task", title: "New", flow: "prd", baseBranch: "main", ticketBody: "Ticket." });
     const showAll = "Show all tasks…";
-    const { commands, context, selectionCalls } = fakeExtensionApi([], undefined, [showAll, undefined]);
+    const { commands, context, selectionCalls } = fakeExtensionApi(
+      [],
+      undefined,
+      [showAll, undefined],
+      undefined,
+      true,
+      "rpc",
+    );
     await commands.get("rpi-task")!.handler("", context(project));
     assert.deepEqual(selectionCalls[0]!.options, ["new-task · New · prd", "old-task · Old · rpi", showAll]);
     assert.deepEqual(selectionCalls[1]!.options, [
@@ -945,6 +959,7 @@ function fakeExtensionApi(
   ) => void,
   hasUI = true,
   mode: "tui" | "rpc" | "print" = hasUI ? "tui" : "print",
+  customInputs: string[] = [],
 ) {
   const tools = new Map<string, Tool>();
   const commands = new Map<string, Command>();
@@ -1042,6 +1057,28 @@ function fakeExtensionApi(
       select: async (title: string, options: string[]) => {
         selectionCalls.push({ title, options });
         return selections.shift();
+      },
+      custom: async <T>(
+        factory: (tui: unknown, theme: unknown, keybindings: unknown, done: (value: T) => void) => unknown,
+      ) => {
+        if (customInputs.length === 0) return undefined;
+        let result: T | undefined;
+        const component = factory(
+          { requestRender: () => undefined },
+          { fg: (_color: string, text: string) => text, bg: (_color: string, text: string) => text },
+          {
+            matches: (data: string, binding: string) =>
+              (binding === "tui.select.up" && (data === "\u001b[A" || data === "k")) ||
+              (binding === "tui.select.down" && (data === "\u001b[B" || data === "j")) ||
+              (binding === "tui.select.confirm" && data === "\r") ||
+              (binding === "tui.select.cancel" && data === "\u001b"),
+          },
+          (value: T) => {
+            result = value;
+          },
+        ) as { handleInput?: (data: string) => void };
+        for (const input of customInputs) component.handleInput?.(input);
+        return result;
       },
       setStatus: (_key: string, value: string | undefined) => {
         statuses.push(value);
