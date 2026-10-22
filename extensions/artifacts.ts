@@ -47,6 +47,8 @@ import {
   validateSlug,
   suggestTaskActions,
   type TaskManifest,
+  groupTasks,
+  type TaskRecord,
 } from "../src/engine/index.ts";
 import { resolveManagedArtifactPath } from "../src/engine/engine.ts";
 import { isWithinRoot, resolveArtifactPath } from "../src/paths.ts";
@@ -221,6 +223,19 @@ function clearActiveTaskFooter(ctx: ExtensionContext): void {
 function taskDir(root: string, slug: string): string {
   validateSlug(slug);
   return resolve(root, slug);
+}
+
+function taskLabel(task: TaskRecord, includeState = false): string {
+  const { manifest } = task;
+  let state = "";
+  if (includeState) {
+    if (task.view === "completed") state = " · completed";
+    else {
+      const inReview = manifest.artifacts.filter((artifact) => artifact.status === "in-review").length;
+      if (inReview > 0) state = ` · ${inReview} in review`;
+    }
+  }
+  return `${manifest.slug} · ${manifest.title} · ${manifest.flow}${state}`;
 }
 
 async function currentTask(pi: ExtensionAPI, ctx: ExtensionContext): Promise<{ slug: string; taskDir: string } | null> {
@@ -756,7 +771,6 @@ export default function artifactsExtension(pi: ExtensionAPI): void {
       ),
     }),
     async execute(_toolCallId, params, _signal, _onUpdate, ctx) {
-      const root = artifactRoot(ctx.cwd);
       const active = await currentTask(pi, ctx);
       if (!active) throw new Error("No task selected. First call rpi_get_task_context.");
       const created = await withTaskMutationQueue(active.taskDir, () =>
@@ -798,7 +812,6 @@ export default function artifactsExtension(pi: ExtensionAPI): void {
       content: Type.String({ description: "New full markdown content" }),
     }),
     async execute(_toolCallId, params, _signal, _onUpdate, ctx) {
-      const root = artifactRoot(ctx.cwd);
       const active = await currentTask(pi, ctx);
       if (!active) throw new Error("No task selected. First call rpi_get_task_context.");
       const { contentHash, invalidatedArtifactIds, updatedManifest } = await withTaskMutationQueue(
@@ -838,7 +851,6 @@ export default function artifactsExtension(pi: ExtensionAPI): void {
       status: StringEnum(["draft", "in-review", "approved", "superseded"] as const),
     }),
     async execute(_toolCallId, params, _signal, _onUpdate, ctx) {
-      const root = artifactRoot(ctx.cwd);
       const active = await currentTask(pi, ctx);
       if (!active) throw new Error("No task selected. First call rpi_get_task_context.");
       const manifest = await loadManifest(active.taskDir);
@@ -1168,26 +1180,33 @@ export default function artifactsExtension(pi: ExtensionAPI): void {
       const root = artifactRoot(ctx.cwd);
       let slug = args.trim();
       if (!slug) {
-        const tasks = [] as Array<{ slug: string; title: string; flow: string }>;
+        const manifests: TaskManifest[] = [];
         try {
           const entries = await readdir(root, { withFileTypes: true });
           for (const entry of entries) {
             if (!entry.isDirectory()) continue;
             const manifest = await tryLoadManifest(taskDir(root, entry.name));
-            if (manifest) tasks.push({ slug: manifest.slug, title: manifest.title, flow: manifest.flow });
+            if (manifest) manifests.push(manifest);
           }
         } catch {
-          /* A missing artifact root has no selectable tasks. */
+          /* Missing roots have no tasks. */
         }
-        tasks.sort((left, right) => left.slug.localeCompare(right.slug));
-        if (tasks.length === 0) {
-          await ctx.ui.notify("No tasks yet. Use /rpi-new.", "info");
-          return;
-        }
-        const labels = tasks.map((task) => `${task.slug} · ${task.title} · ${task.flow}`);
-        const choice = await ctx.ui.select("Select task:", labels);
+        const groups = groupTasks(manifests);
+        const showAll = "Show all tasks…";
+        const activeLabels = groups.active.map((task) => taskLabel(task));
+        const choice = await ctx.ui.select("Select task:", [...activeLabels, showAll]);
         if (!choice) return;
-        slug = tasks[labels.indexOf(choice)]!.slug;
+        let selected: TaskRecord | undefined;
+        if (choice === showAll) {
+          const allLabels = groups.all.map((task) => taskLabel(task, true));
+          const allChoice = await ctx.ui.select("Select task:", allLabels);
+          if (!allChoice) return;
+          selected = groups.all[allLabels.indexOf(allChoice)];
+        } else {
+          selected = groups.active[activeLabels.indexOf(choice)];
+        }
+        if (!selected) return;
+        slug = selected.manifest.slug;
       }
       const manifest = await tryLoadManifest(taskDir(root, slug));
       if (!manifest) {

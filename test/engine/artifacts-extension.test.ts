@@ -9,6 +9,7 @@ import { initTheme } from "@earendil-works/pi-coding-agent";
 import artifactsExtension, { gitAddBlockReason } from "../../extensions/artifacts.ts";
 import {
   createArtifact,
+  completeTask,
   createTask,
   loadManifest,
   setArtifactStatus,
@@ -554,6 +555,46 @@ test("rpi-task selects an existing task from the picker and does not create miss
     assert.ok(
       statuses.includes("pick-me · rpi · actions: create research-questions, create mockup (optional) · 0 in review"),
     );
+  } finally {
+    await rm(project, { recursive: true, force: true });
+  }
+});
+
+test("rpi-task lists active tasks newest first, then all tasks on request", async () => {
+  const project = await tempProject();
+  const root = join(project, ".pi", "artifacts");
+  const pause = () => new Promise((resolve) => setTimeout(resolve, 5));
+  try {
+    await createTask(root, { slug: "old-task", title: "Old", flow: "rpi", baseBranch: "main", ticketBody: "Ticket." });
+    await pause();
+    const done = await createTask(root, {
+      slug: "done-task",
+      title: "Done",
+      flow: "oneshot",
+      baseBranch: "main",
+      ticketBody: "Ticket.",
+    });
+    await completeTask(done, join(root, "done-task"));
+    await pause();
+    await createTask(root, {
+      slug: "free-task",
+      title: "Free",
+      flow: "freeform",
+      baseBranch: "main",
+      ticketBody: "Ticket.",
+    });
+    await pause();
+    await createTask(root, { slug: "new-task", title: "New", flow: "prd", baseBranch: "main", ticketBody: "Ticket." });
+    const showAll = "Show all tasks…";
+    const { commands, context, selectionCalls } = fakeExtensionApi([], undefined, [showAll, undefined]);
+    await commands.get("rpi-task")!.handler("", context(project));
+    assert.deepEqual(selectionCalls[0]!.options, ["new-task · New · prd", "old-task · Old · rpi", showAll]);
+    assert.deepEqual(selectionCalls[1]!.options, [
+      "new-task · New · prd",
+      "free-task · Free · freeform",
+      "done-task · Done · oneshot · completed",
+      "old-task · Old · rpi",
+    ]);
   } finally {
     await rm(project, { recursive: true, force: true });
   }

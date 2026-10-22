@@ -47,3 +47,5 @@ export type {
   SuggestedTaskAction,
   SuggestedTaskActionKind,
 } from "./engine.ts";
+export { isCompleted, taskView, lastModified, groupTasks } from "./task-views.ts";
+export type { TaskView, TaskRecord, TaskGroups } from "./task-views.ts";
