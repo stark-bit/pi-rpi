@@ -11,8 +11,10 @@ pi install -l /path/to/pi-rpi
 ```text
 /rpi-init
 /rpi-new
-/rpi-task eng-1478-parent-child
+/rpi-task
 ```
+
+In the interactive picker, use Left/Right to switch among Active, Freeform, Completed, and All. Views wrap around, and each view orders tasks newest first. Select a task with Enter, or press Escape to cancel. RPC clients show Active tasks first and offer `Show all tasks…` for the complete list. To skip the picker, use `/rpi-task eng-1478-parent-child`.
 
 The selected task is available to commands and tools in this extension session. RPI saves that selection in session history, so Pi restores it when you return to the session. You can also call `rpi_get_task_context` with a slug to select a task explicitly.
 
@@ -40,7 +42,7 @@ An agent-run receipt alone does not mark a phase committed or human-approved.
 
 ## Resume
 
-Use `/rpi-task eng-1478-parent-child` to select the task again. Pi normally restores the task selected in that session. The manifest retains artifact state and receipts. Check plan or outline progress and verify the associated commit receipt before treating a phase as complete.
+Use `/rpi-task eng-1478-parent-child` to select the task again. Pi normally restores the task selected in that session. The manifest retains artifact state, completion state, and receipts. Use `/rpi-complete` or `/rpi-reopen` to control completion manually, including for freeform tasks. Check plan or outline progress and verify the associated commit receipt before treating a phase as complete.
 
 ## Troubleshooting
 

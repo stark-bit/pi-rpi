@@ -21,7 +21,7 @@ pi install /path/to/pi-rpi      # installed package
 /rpi-task
 ```
 
-`/rpi-new [intent]` accepts task intent (and opens an editor when omitted), then opens a flow picker. The active LLM generates the title and slug, then creates and selects the chosen task flow. `/rpi-task [slug]` selects an existing task: without a slug it opens a picker, and with a slug it is a fast path. RPI stores the selected task in session history, so Pi restores it when you return to the session.
+`/rpi-new [intent]` accepts task intent (and opens an editor when omitted), then opens a flow picker. The active LLM generates the title and slug, then creates and selects the chosen task flow. `/rpi-task [slug]` selects an existing task: without a slug it opens a tabbed picker, and with a slug it is a fast path. The interactive picker shows Active, Freeform, Completed, and All views; Left/Right switches views with wrap-around, and tasks are newest first. RPC clients receive the Active list plus a `Show all tasks…` option. RPI stores the selected task in session history, so Pi restores it when you return to the session.
 
 Flow presets:
 
@@ -83,7 +83,9 @@ human verification
 
 - `/rpi-init` — create `.pi/artifacts/`, add artifact and local-workspace ignore entries, and create the default shared `.pi/workspace.json` without replacing an existing config.
 - `/rpi-new [intent]` — choose a flow, then create and select a task from intent; the active LLM generates its title and slug.
-- `/rpi-task [slug]` — select an existing task from a picker, or use a slug as a fast path. The Pi footer shows its flow, suggested actions, and artifact review count.
+- `/rpi-task [slug]` — select an existing task from the Active, Freeform, Completed, or All view, or use a slug as a fast path. The interactive picker switches views with Left/Right, wraps at either end, and orders tasks newest first. RPC clients get Active tasks plus a `Show all tasks…` option. The Pi footer shows its flow, suggested actions, and artifact review count.
+- `/rpi-complete` — mark the active task completed, including freeform tasks.
+- `/rpi-reopen` — reopen the active task.
 - `/rpi-change-base` — select the active task's Git base branch.
 - `/rpi-annotate` — annotate the active task's artifact directory with Plannotator; feedback returns to the active agent.
 - `/rpi-status` — show a durable selected-task report with stages, dependency edges, and suggested actions.
@@ -101,7 +103,7 @@ human verification
 
 ## Manifest and commits
 
-Task state lives in `.pi/artifacts/<slug>/artifact-manifest.json`. It includes artifact hashes, dependencies, status transitions, agent-run receipts, and verified phase-commit receipts. Artifact writes validate the resulting manifest before persistence. If manifest persistence fails, owned new files are removed and replaced files are restored on a best-effort basis; errors retain rollback details. A run receipt proves an agent run, not human verification or a Git commit. Artifact approval is an explicit human status transition. Substantive edits return the edited artifact and its active transitive dependents to draft. The only approval-preserving edit adds a `✅` marker to a canonical plan or outline phase heading after its phase-commit receipt exists; every other byte must remain unchanged.
+Task state lives in `.pi/artifacts/<slug>/artifact-manifest.json`. It includes artifact hashes, dependencies, status transitions, agent-run receipts, and verified phase-commit receipts. `completedAt` is an optional ISO timestamp. Final approval of every required artifact sets it for non-freeform tasks; substantive edits that break completion clear it. `/rpi-complete` and `/rpi-reopen` set or clear it for any flow and record `task-complete` or `task-reopen` receipts. Tasks without `completedAt` can still appear as Completed when their required artifacts are already approved. Artifact writes validate the resulting manifest before persistence. If manifest persistence fails, owned new files are removed and replaced files are restored on a best-effort basis; errors retain rollback details. A run receipt proves an agent run, not human verification or a Git commit. Artifact approval is an explicit human status transition. Substantive edits return the edited artifact and its active transitive dependents to draft. The only approval-preserving edit adds a `✅` marker to a canonical plan or outline phase heading after its phase-commit receipt exists; every other byte must remain unchanged.
 
 In interactive Pi, `/rpi-status` and `/rpi-artifacts` add an expandable report to session history. Its collapsed row shows the next suggested action and a configured keybinding hint. RPC mode receives the report as a notification. For an active task, Pi's built-in footer shows `<slug> · <flow> · actions: <suggestions> · <count> in review`. Agent-run status accepts a well-formed fleet snapshot that omits the owned run only when the targeted status text still supplies its state; malformed snapshots and invalid states fail rather than being treated as progress.
 

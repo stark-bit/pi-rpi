@@ -1,6 +1,9 @@
 # Changelog
 
 ## Unreleased
+
+- Added tabbed `/rpi-task` views with newest-first ordering, Left/Right wrap-around, RPC Active-task fallback, and Completed state markers.
+- Added `/rpi-complete` and `/rpi-reopen` for manual completion control, including freeform tasks; manifests now retain optional `completedAt` state with task-complete and task-reopen receipts.
 - Invalidated stale artifact approvals and active dependent approvals after substantive edits while preserving receipt-backed phase-heading completion updates.
 - Removed the redundant `/plan`, `/prd`, `/research`, and related document-skeleton prompt templates; RPI skills remain the canonical artifact workflows.
 - Added oxfmt commands for formatting and checking TypeScript and JSON source files.

@@ -69,6 +69,23 @@ tuistory -s pi-rpi-subagents-smoke snapshot --trim
 
 Record the run ID and state. Verify cancellation leaves the run paused/resumable rather than falsely complete, creates no orphan child, and does not mutate the authoritative artifact.
 
+## Task picker check
+
+In the same dedicated Pi session, verify the task-selection UI separately from the agent-run fixtures. Prepare disposable tasks in Active, Freeform, and Completed states, including a task that has approved required artifacts but no `completedAt` field. Then run `/rpi-task` and capture a snapshot after each action:
+
+```sh
+tuistory -s pi-rpi-subagents-smoke type "/rpi-task"
+tuistory -s pi-rpi-subagents-smoke snapshot --trim
+tuistory -s pi-rpi-subagents-smoke press enter
+tuistory -s pi-rpi-subagents-smoke snapshot --trim
+tuistory -s pi-rpi-subagents-smoke press right
+tuistory -s pi-rpi-subagents-smoke snapshot --trim
+tuistory -s pi-rpi-subagents-smoke press left
+tuistory -s pi-rpi-subagents-smoke snapshot --trim
+```
+
+Confirm the picker shows `Active`, `Freeform`, `Completed`, and `All` with counts; Left/Right changes views and wraps from Active to All and back. Confirm each view is newest first, the Completed view includes the pre-existing completed task without writing its manifest, and an empty view renders its empty-state message. Press Escape to cancel, then verify the slug fast path still selects the requested task with `/rpi-task <slug>`. For RPC mode, verify the first selection contains Active tasks followed by `Show all tasks…`; selecting that row opens the full list with completion and review markers.
+
 ## Preserve evidence and teardown
 
 ```sh
