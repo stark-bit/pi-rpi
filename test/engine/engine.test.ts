@@ -20,6 +20,8 @@ import {
   recordPhaseCommit,
   setArtifactStatus,
   setBaseBranch,
+  completeTask,
+  reopenTask,
   updateArtifact,
   validateSlug,
   hashFile,
@@ -906,6 +908,31 @@ test("setBaseBranch persists the selected ref, records a receipt, and preserves 
     ),
   );
   await assert.rejects(setBaseBranch(updated, "", taskDir), /Base branch must not be empty/);
+  await rm(base, { recursive: true, force: true });
+});
+
+test("completeTask and reopenTask persist receipts and synchronize callers", async () => {
+  const base = await mkTmp();
+  const task = await createTask(base, {
+    slug: "manual-completion",
+    title: "Manual completion",
+    flow: "freeform",
+    baseBranch: "main",
+  });
+  const taskDir = join(base, task.slug);
+  const stale = await loadManifest(taskDir);
+  const completed = await completeTask(stale, taskDir);
+  assert.equal(completed.completedAt, stale.completedAt);
+  assert.equal(completed.receipts.at(-1)?.kind, "task-complete");
+  const bytesAfterComplete = await readFile(join(taskDir, "artifact-manifest.json"));
+  await completeTask(completed, taskDir);
+  assert.deepEqual(await readFile(join(taskDir, "artifact-manifest.json")), bytesAfterComplete);
+  const reopened = await reopenTask(completed, taskDir);
+  assert.equal(reopened.completedAt, undefined);
+  assert.equal(reopened.receipts.at(-1)?.kind, "task-reopen");
+  const bytesAfterReopen = await readFile(join(taskDir, "artifact-manifest.json"));
+  await reopenTask(reopened, taskDir);
+  assert.deepEqual(await readFile(join(taskDir, "artifact-manifest.json")), bytesAfterReopen);
   await rm(base, { recursive: true, force: true });
 });
 

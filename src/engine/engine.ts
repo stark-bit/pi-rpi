@@ -1405,6 +1405,32 @@ export async function changeFlow(manifest: TaskManifest, flow: Flow, taskDir?: s
   });
 }
 
+/** Mark a task completed and record the transition. */
+export async function completeTask(manifest: TaskManifest, taskDir: string): Promise<TaskManifest> {
+  return withTaskLock(taskDir, async () => {
+    const freshManifest = await loadManifest(taskDir);
+    if (freshManifest.completedAt !== undefined) return synchronizeManifest(manifest, freshManifest);
+    const timestamp = new Date().toISOString();
+    freshManifest.completedAt = timestamp;
+    freshManifest.receipts.push({ kind: "task-complete", timestamp });
+    await saveManifest(taskDir, freshManifest);
+    return synchronizeManifest(manifest, freshManifest);
+  });
+}
+
+/** Reopen a task and record the transition. */
+export async function reopenTask(manifest: TaskManifest, taskDir: string): Promise<TaskManifest> {
+  return withTaskLock(taskDir, async () => {
+    const freshManifest = await loadManifest(taskDir);
+    if (freshManifest.completedAt === undefined) return synchronizeManifest(manifest, freshManifest);
+    const timestamp = new Date().toISOString();
+    freshManifest.completedAt = undefined;
+    freshManifest.receipts.push({ kind: "task-reopen", timestamp });
+    await saveManifest(taskDir, freshManifest);
+    return synchronizeManifest(manifest, freshManifest);
+  });
+}
+
 /** Change a task's Git base branch and record the selected ref. */
 export async function setBaseBranch(
   manifest: TaskManifest,

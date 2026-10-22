@@ -36,6 +36,8 @@ import {
   findArtifact,
   readArtifact,
   loadManifest,
+  completeTask,
+  reopenTask,
   setArtifactStatus,
   setBaseBranch,
   recordPhaseCommit,
@@ -1195,6 +1197,46 @@ export default function artifactsExtension(pi: ExtensionAPI): void {
       selectTask(pi, ctx.cwd, slug);
       setActiveTaskFooter(ctx, manifest);
       await ctx.ui.notify(`Active task: ${slug}`, "info");
+    },
+  });
+
+  pi.registerCommand("rpi-complete", {
+    description: "Mark the active task completed.",
+    handler: async (_args, ctx) => {
+      requireCommandUI(ctx);
+      const active = await currentTask(pi, ctx);
+      if (!active) {
+        await ctx.ui.notify("No active task. Use /rpi-task.", "info");
+        return;
+      }
+      const manifest = await loadManifest(active.taskDir);
+      if (manifest.completedAt !== undefined) {
+        await ctx.ui.notify(`${active.slug} is already completed.`, "info");
+        return;
+      }
+      await withTaskMutationQueue(active.taskDir, () => completeTask(manifest, active.taskDir));
+      setActiveTaskFooter(ctx, manifest);
+      await ctx.ui.notify(`${active.slug} -> completed`, "info");
+    },
+  });
+
+  pi.registerCommand("rpi-reopen", {
+    description: "Reopen the active task.",
+    handler: async (_args, ctx) => {
+      requireCommandUI(ctx);
+      const active = await currentTask(pi, ctx);
+      if (!active) {
+        await ctx.ui.notify("No active task. Use /rpi-task.", "info");
+        return;
+      }
+      const manifest = await loadManifest(active.taskDir);
+      if (manifest.completedAt === undefined) {
+        await ctx.ui.notify(`${active.slug} is already open.`, "info");
+        return;
+      }
+      await withTaskMutationQueue(active.taskDir, () => reopenTask(manifest, active.taskDir));
+      setActiveTaskFooter(ctx, manifest);
+      await ctx.ui.notify(`${active.slug} -> reopened`, "info");
     },
   });
 

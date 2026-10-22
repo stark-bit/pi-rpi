@@ -1030,6 +1030,35 @@ function fakeExtensionApi(
   };
 }
 
+test("completion commands update freeform tasks and refresh the footer", async () => {
+  const project = await tempProject();
+  const root = join(project, ".pi", "artifacts");
+  await createTask(root, {
+    slug: "manual-command",
+    title: "Manual command",
+    flow: "freeform",
+    baseBranch: "main",
+  });
+  const extension = fakeExtensionApi([
+    {
+      type: "message",
+      message: { role: "toolResult", toolName: "rpi_create_task", details: { taskSlug: "manual-command" } },
+    },
+  ]);
+  const context = extension.context(project);
+  try {
+    await extension.commands.get("rpi-complete")!.handler("", context);
+    assert.deepEqual(extension.notifications, ["manual-command -> completed"]);
+    assert.ok(extension.statuses.length > 0);
+    assert.equal((await loadManifest(join(root, "manual-command"))).completedAt !== undefined, true);
+    await extension.commands.get("rpi-reopen")!.handler("", context);
+    assert.deepEqual(extension.notifications, ["manual-command -> completed", "manual-command -> reopened"]);
+    assert.equal((await loadManifest(join(root, "manual-command"))).completedAt, undefined);
+  } finally {
+    await rm(project, { recursive: true, force: true });
+  }
+});
+
 async function tempProject(): Promise<string> {
   return mkdtemp(join(tmpdir(), "rpi-extension-"));
 }

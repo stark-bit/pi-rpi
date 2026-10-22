@@ -31,6 +31,8 @@ export {
   suggestTaskActions,
   requiredTypesApproved,
   changeFlow,
+  completeTask,
+  reopenTask,
   setBaseBranch,
   recordRunId,
   recordTaskRun,
