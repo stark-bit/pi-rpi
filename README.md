@@ -34,6 +34,51 @@ freeform: no enforced chain
 
 `mockup`, `diagram`, and `pr-walkthrough` are optional supporting artifacts in rpi, prd, and oneshot flows. They do not block flow changes. `ticket` is task input. Superseded artifacts remain as history but do not block a flow change; active incompatible artifacts still do.
 
+## Workflow
+
+```mermaid
+flowchart TD
+    A[User request] --> B[Create task]
+    B --> C[Research current code]
+    C --> D{Need product decisions?}
+    D -- Yes --> E[Create PRD]
+    E --> F[Design discussion]
+    D -- No --> F
+    F --> G[Create structure outline]
+    G --> H{Need detailed plan?}
+    H -- Yes --> I[Create implementation plan]
+    H -- No --> J[Approve outline]
+    I --> K[Approve plan]
+    J --> L[Implement one phase]
+    K --> L
+    L --> M[Run automated checks]
+    M --> N{Checks pass?}
+    N -- No --> O[Fix implementation]
+    O --> M
+    N -- Yes --> P[Human verification]
+    P --> Q{Feedback or changes?}
+    Q -- Yes --> R[Update artifact or implementation]
+    R --> L
+    Q -- No --> S[Review implementation]
+    S --> T[Record verified commit]
+    T --> U[Describe or open PR]
+```
+
+Iteration returns to the affected artifact or implementation phase:
+
+```text
+feedback
+  ↓
+update artifact or implementation
+  ↓
+implement affected phase
+  ↓
+run checks
+  ↓
+human verification
+  └── repeat until accepted
+```
+
 ## Commands
 
 - `/rpi-init` — create `.pi/artifacts/`, add artifact and local-workspace ignore entries, and create the default shared `.pi/workspace.json` without replacing an existing config.
