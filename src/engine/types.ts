@@ -39,7 +39,8 @@ export type ReceiptKind =
   | "phase-commit"
   | "agent-run"
   | "migration"
-  | "drift";
+  | "drift"
+  | "task-complete";
 
 export interface Receipt {
   kind: ReceiptKind;
@@ -73,6 +74,7 @@ export interface TaskManifest {
   baseBranch: string;
   artifacts: Artifact[];
   receipts: Receipt[];
+  completedAt?: string;
 }
 
 export const SCHEMA_VERSION = 1 as const;

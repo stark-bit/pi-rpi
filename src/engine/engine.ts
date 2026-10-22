@@ -421,7 +421,7 @@ function parseTaskManifest(value: unknown, taskDir: string): TaskManifest {
   const manifest = parseRecord(value, "manifest");
   assertExactKeys(
     manifest,
-    ["schemaVersion", "id", "slug", "title", "ticketUrl", "flow", "baseBranch", "artifacts", "receipts"],
+    ["schemaVersion", "id", "slug", "title", "ticketUrl", "flow", "baseBranch", "artifacts", "receipts", "completedAt"],
     "manifest",
   );
   if (manifest.schemaVersion !== SCHEMA_VERSION) throw new EngineError("Invalid manifest.schemaVersion: expected 1.");
@@ -434,6 +434,8 @@ function parseTaskManifest(value: unknown, taskDir: string): TaskManifest {
   const flow = parseFlow(manifest.flow, "manifest.flow");
   const ticketUrl =
     manifest.ticketUrl === undefined ? undefined : parseString(manifest.ticketUrl, "manifest.ticketUrl");
+  const completedAt =
+    manifest.completedAt === undefined ? undefined : parseTimestamp(manifest.completedAt, "manifest.completedAt");
   const artifacts = parseArray(manifest.artifacts, "manifest.artifacts").map((artifact, index) =>
     parseArtifact(artifact, `manifest.artifacts[${index}]`),
   );
@@ -441,7 +443,18 @@ function parseTaskManifest(value: unknown, taskDir: string): TaskManifest {
     parseReceipt(receipt, `manifest.receipts[${index}]`),
   );
   assertManifestRelationships(artifacts, receipts);
-  return { schemaVersion: SCHEMA_VERSION, id, slug, title, ticketUrl, flow, baseBranch, artifacts, receipts };
+  return {
+    schemaVersion: SCHEMA_VERSION,
+    id,
+    slug,
+    title,
+    ticketUrl,
+    flow,
+    baseBranch,
+    artifacts,
+    receipts,
+    completedAt,
+  };
 }
 
 function parseArtifact(value: unknown, field: string): Artifact {
@@ -493,6 +506,7 @@ function assertReceiptFields(kind: Receipt["kind"], fields: Omit<Receipt, "kind"
     "phase-commit": ["phaseId", "runId", "commitSha"],
     "agent-run": ["runId", "detail"],
     migration: ["detail"],
+    "task-complete": [],
   };
   const allowed: Record<Receipt["kind"], Array<keyof typeof fields>> = {
     "status-change": ["artifactId", "detail"],
@@ -503,6 +517,7 @@ function assertReceiptFields(kind: Receipt["kind"], fields: Omit<Receipt, "kind"
     "phase-commit": ["phaseId", "runId", "commitSha"],
     "agent-run": ["runId", "detail"],
     migration: ["detail"],
+    "task-complete": ["detail"],
   };
   for (const name of required[kind])
     if (fields[name] === undefined) throw new EngineError(`Invalid ${field}.${name}: required for ${kind}.`);
@@ -629,7 +644,8 @@ function parseReceiptKind(value: unknown, field: string): Receipt["kind"] {
     kind !== "phase-commit" &&
     kind !== "agent-run" &&
     kind !== "migration" &&
-    kind !== "drift"
+    kind !== "drift" &&
+    kind !== "task-complete"
   )
     throw new EngineError(`Invalid ${field}: unknown receipt kind "${kind}".`);
   return kind;
@@ -883,6 +899,14 @@ const OPTIONAL_SUGGESTION_ARTIFACT_TYPES = new Set<ArtifactType>([
   "diagram",
   "pr-walkthrough",
 ]);
+const COMPLETION_EXCLUDED_TYPES = new Set<ArtifactType>(["ticket", "plan", "mockup", "diagram", "pr-walkthrough"]);
+
+export function requiredTypesApproved(manifest: TaskManifest): boolean {
+  if (manifest.flow === "freeform") return false;
+  return FLOW_CHAINS[manifest.flow]
+    .filter((type) => !COMPLETION_EXCLUDED_TYPES.has(type))
+    .every((type) => findArtifact(manifest, type)?.status === "approved");
+}
 
 function isArtifactCreationReady(manifest: TaskManifest, type: ArtifactType): boolean {
   if (findArtifact(manifest, type)) return false;
@@ -953,7 +977,7 @@ export function suggestTaskActions(manifest: TaskManifest): SuggestedTaskAction[
     .map((type) => suggestedCreationAction(manifest, type, true));
 
   if (primaryActions.length > 0) return [...primaryActions, ...optionalArtifactSuggestions, ...optionalActions];
-  if (requiredTypes.every((type) => findArtifact(manifest, type)?.status === "approved")) {
+  if (requiredTypesApproved(manifest)) {
     return [{ kind: "complete", label: "workflow complete" }, ...optionalArtifactSuggestions, ...optionalActions];
   }
   if (optionalArtifactSuggestions.length > 0) return optionalArtifactSuggestions;
@@ -1269,11 +1293,16 @@ export async function setArtifactStatus(
     if (from === status) return freshManifest;
     assertStatusTransition(from, status, artifact.id);
     artifact.status = status;
+    const timestamp = new Date().toISOString();
     freshManifest.receipts.push({
       kind: status === "approved" ? "approval" : "status-change",
       artifactId: artifact.id,
-      timestamp: new Date().toISOString(),
+      timestamp,
     });
+    if (status === "approved" && !freshManifest.completedAt && requiredTypesApproved(freshManifest)) {
+      freshManifest.completedAt = timestamp;
+      freshManifest.receipts.push({ kind: "task-complete", timestamp });
+    }
     return freshManifest;
   };
   if (!taskDir) return mutate(manifest);

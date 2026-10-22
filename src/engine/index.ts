@@ -29,6 +29,7 @@ export {
   assertStatusTransition,
   resolvePrecedence,
   suggestTaskActions,
+  requiredTypesApproved,
   changeFlow,
   setBaseBranch,
   recordRunId,

@@ -24,6 +24,7 @@ import {
   hashFile,
   safeRelativePath,
   ensureWithin,
+  requiredTypesApproved,
 } from "../../src/engine/engine.ts";
 import { isTypeEnabled } from "../../src/engine/types.ts";
 
@@ -33,6 +34,59 @@ async function mkTmp(): Promise<string> {
   const d = await mkdtemp(join(tmpdir(), "rpi-engine-"));
   return d;
 }
+
+test("completion is recorded only after final required approval", async () => {
+  const base = await mkTmp();
+  const taskDir = join(base, "completion-test");
+  await createTask(base, {
+    slug: "completion-test",
+    title: "Completion",
+    flow: "oneshot",
+    baseBranch: "main",
+    ticketBody: "ticket",
+  });
+  let manifest = await loadManifest(taskDir);
+  assert.equal(manifest.completedAt, undefined);
+  assert.equal(requiredTypesApproved(manifest), false);
+
+  await createArtifact(taskDir, {
+    type: "implementation",
+    description: "implementation",
+    content: "implementation",
+    dependsOn: ["ticket"],
+  });
+  manifest = await setArtifactStatus(await loadManifest(taskDir), "implementation", "in-review", taskDir);
+  manifest = await setArtifactStatus(manifest, "implementation", "approved", taskDir);
+  assert.equal(manifest.completedAt, undefined);
+  assert.equal(
+    manifest.receipts.some((receipt) => receipt.kind === "task-complete"),
+    false,
+  );
+
+  await createArtifact(taskDir, {
+    type: "pr-description",
+    description: "pr-description",
+    content: "description",
+    dependsOn: ["implementation"],
+  });
+  manifest = await setArtifactStatus(await loadManifest(taskDir), "pr-description", "in-review", taskDir);
+  manifest = await setArtifactStatus(manifest, "pr-description", "approved", taskDir);
+  assert.match(manifest.completedAt ?? "", /^\d{4}-\d{2}-\d{2}T/);
+  assert.equal(manifest.receipts.filter((receipt) => receipt.kind === "task-complete").length, 1);
+  assert.equal(requiredTypesApproved(manifest), true);
+  assert.equal((await loadManifest(taskDir)).completedAt, manifest.completedAt);
+
+  const freeformDir = join(base, "freeform-test");
+  await createTask(base, { slug: "freeform-test", title: "Freeform", flow: "freeform", baseBranch: "main" });
+  const freeform = await loadManifest(freeformDir);
+  assert.equal(requiredTypesApproved(freeform), false);
+
+  const raw = JSON.parse(await readFile(join(taskDir, "artifact-manifest.json"), "utf8")) as Record<string, unknown>;
+  raw.completedAt = "not-a-timestamp";
+  await writeFile(join(taskDir, "artifact-manifest.json"), JSON.stringify(raw));
+  await assert.rejects(loadManifest(taskDir), /manifest.completedAt/);
+  await rm(base, { recursive: true, force: true });
+});
 
 test("validateSlug accepts kebab-case and rejects bad input", () => {
   assert.doesNotThrow(() => validateSlug("eng-1478-parent-child"));
