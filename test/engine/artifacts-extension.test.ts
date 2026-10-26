@@ -567,6 +567,22 @@ test("rpi-task selects an existing task from the picker and does not create miss
   }
 });
 
+test("rpi-task ignores non-slug directories such as .git", async () => {
+  const project = await tempProject();
+  const root = join(project, ".pi", "artifacts");
+  try {
+    await createTask(root, { slug: "keep-me", title: "Keep", flow: "rpi", baseBranch: "main", ticketBody: "Ticket." });
+    await mkdir(join(root, ".git"));
+    await mkdir(join(root, "Bad_Name"));
+    const showAll = "Show all tasks…";
+    const { commands, context, selectionCalls } = fakeExtensionApi([], undefined, [undefined], undefined, true, "rpc");
+    await commands.get("rpi-task")!.handler("", context(project));
+    assert.deepEqual(selectionCalls[0]!.options, ["keep-me · Keep · rpi", showAll]);
+  } finally {
+    await rm(project, { recursive: true, force: true });
+  }
+});
+
 test("rpi-task lists active tasks newest first, then all tasks on request", async () => {
   const project = await tempProject();
   const root = join(project, ".pi", "artifacts");

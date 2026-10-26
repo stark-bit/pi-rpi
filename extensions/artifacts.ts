@@ -221,6 +221,15 @@ function clearActiveTaskFooter(ctx: ExtensionContext): void {
   if (ctx.hasUI) ctx.ui.setStatus("rpi-active", undefined);
 }
 
+function isSlug(name: string): boolean {
+  try {
+    validateSlug(name);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 function taskDir(root: string, slug: string): string {
   validateSlug(slug);
   return resolve(root, slug);
@@ -1168,7 +1177,7 @@ export default function artifactsExtension(pi: ExtensionAPI): void {
       try {
         const entries = await readdir(artifactRoot(process.cwd()), { withFileTypes: true });
         return entries
-          .filter((entry) => entry.isDirectory() && entry.name.startsWith(prefix))
+          .filter((entry) => entry.isDirectory() && isSlug(entry.name) && entry.name.startsWith(prefix))
           .map((entry) => entry.name)
           .sort()
           .map((slug) => ({ value: slug, label: slug }));
@@ -1185,9 +1194,13 @@ export default function artifactsExtension(pi: ExtensionAPI): void {
         try {
           const entries = await readdir(root, { withFileTypes: true });
           for (const entry of entries) {
-            if (!entry.isDirectory()) continue;
-            const manifest = await tryLoadManifest(taskDir(root, entry.name));
-            if (manifest) manifests.push(manifest);
+            if (!entry.isDirectory() || !isSlug(entry.name)) continue;
+            try {
+              const manifest = await tryLoadManifest(taskDir(root, entry.name));
+              if (manifest) manifests.push(manifest);
+            } catch {
+              /* Skip unreadable tasks. */
+            }
           }
         } catch {
           /* Missing roots have no tasks. */
