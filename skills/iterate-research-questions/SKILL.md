@@ -16,7 +16,7 @@ Update the existing research-questions artifact in place. Do not create a new ar
 
 1. If no feedback is given, ask what to change, add, or remove, then wait.
 2. Update the artifact with `rpi_update_artifact`, preserving its YAML frontmatter, format, and every existing Key Context Pointers entry verbatim. Add a new pointer only when user feedback surfaces it.
-3. Address each requested change without turning the document into a task plan. Keep 3-8 neutral questions unless the task complexity clearly requires fewer or more; questions must ask only how the codebase works now, where it lives, its contracts, patterns, constraints, or edge cases.
+3. Address each requested change without turning the document into a task plan. Keep 2-8 neutral questions unless the task complexity clearly requires fewer or more; questions must ask only how the codebase works now, where it lives, its contracts, patterns, constraints, or edge cases.
 4. Do not leak task intent, proposed changes, recommendations, or “how should we” language into a question. Keep research objective.
 5. When frontend or visual work may be involved, include a question about the active design system or component library and its colors, typography, spacing, borders, shadows, and theming patterns.
 
