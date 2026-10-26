@@ -2,6 +2,34 @@
 
 Local Research-Plan-Implement workflow for [Pi](https://pi.dev). It stores task documents and receipts in a local manifest.
 
+```
+┌────────────────────┐      ┌──────────┐
+│ Research questions │─────▶│ Research │
+└────────────────────┘      └────┬─────┘
+                                 │
+       ┌─────────────────────────┘
+       │
+       │    ┌──────────────────────┐
+       ├───▶│ 1. Design discussion │───┐
+       │    └──────────────────────┘   │
+       │    ┌────────┐    ┌─────┐      │
+       ├───▶│ 2. PRD │───▶│ TDD │──────┤
+       │    └────┬───┘    └─────┘      │
+       │         └─────────────────────┤
+       │    ┌────────┐                 │
+       ├───▶│ 3. TDD │─────────────────┤
+       │    └────────┘                 │    ┌────────────┐
+       │                               ├───▶│  Outline   │
+       │                               │    │ (optional) │
+       │                               │    └─────┬──────┘
+       │                               └──────────┤
+       │                                          ▼
+       │      4. Research only             ┌─────────────┐
+       └──────────────────────────────────▶│  Implement  │
+                                           └─────────────┘
+```
+
+
 ## Install
 
 `pi-rpi` is not published to npm. Install a checkout:
